@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#141414">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MovieSearcher</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#141414; --surface:#1a1a1a; --border:#2a2a2a;
+  --red:#e50914; --red-hover:#b20710;
+  --white:#fff; --gray:#a3a3a3; --dim:#555;
+  --input:#222;
+}
+body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--white); overflow-x:hidden; min-height:100vh; -webkit-tap-highlight-color:transparent; }
+
+/* Top Bar */
+.topbar { position:sticky; top:0; z-index:100; background:rgba(10,10,10,.97); backdrop-filter:blur(10px); padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); }
+.logo { font-size:15px; font-weight:800; color:var(--red); letter-spacing:1px; white-space:nowrap; }
+.toggle { display:flex; background:var(--input); border-radius:20px; overflow:hidden; flex-shrink:0; }
+.toggle button { background:none; border:none; color:var(--gray); font-size:12px; font-weight:700; padding:6px 14px; cursor:pointer; transition:.2s; }
+.toggle button.active { background:var(--red); color:var(--white); }
+.search-wrap { flex:1; position:relative; }
+.search-wrap input { width:100%; background:var(--input); border:1px solid var(--border); border-radius:24px; padding:8px 14px 8px 36px; font-size:14px; color:var(--white); outline:none; transition:border .2s; }
+.search-wrap input:focus { border-color:var(--red); }
+.search-wrap .s-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray); font-size:14px; }
+
+/* Hero Banner */
+.hero { position:relative; width:100%; min-height:55vh; max-height:70vh; overflow:hidden; margin-bottom:4px; }
+.hero-bg { position:absolute; inset:0; background-size:cover; background-position:center top; }
+.hero-gradient { position:absolute; inset:0; background:linear-gradient(to top,var(--bg) 0%,rgba(20,20,20,.85) 30%,rgba(20,20,20,.4) 60%,rgba(20,20,20,.1) 100%); }
+.hero-left { position:absolute; inset:0; background:linear-gradient(to right,rgba(20,20,20,.9) 0%,rgba(20,20,20,.3) 50%,transparent 100%); }
+.hero-info { position:absolute; bottom:16%; left:5%; max-width:75%; z-index:2; }
+.hero-badge { display:inline-block; background:var(--red); color:var(--white); font-size:10px; font-weight:800; padding:3px 8px; border-radius:3px; margin-bottom:10px; letter-spacing:.5px; }
+.hero-title { font-size:clamp(24px,6vw,40px); font-weight:800; line-height:1.1; margin-bottom:8px; text-shadow:0 2px 8px rgba(0,0,0,.6); }
+.hero-meta { font-size:13px; color:var(--gray); margin-bottom:10px; }
+.hero-overview { font-size:13px; color:var(--gray); line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:14px; }
+.btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+.btn-play { display:inline-flex; align-items:center; gap:6px; background:var(--red); color:var(--white); border:none; font-size:15px; font-weight:700; padding:10px 22px; border-radius:5px; cursor:pointer; transition:background .2s; }
+.btn-play:active { background:var(--red-hover); }
+.btn-info { display:inline-flex; align-items:center; gap:6px; background:#4a4a4a; color:var(--white); border:none; font-size:15px; font-weight:700; padding:10px 22px; border-radius:5px; cursor:pointer; transition:background .2s; }
+.btn-info:active { background:#666; }
+
+/* Card Row */
+.row { padding:16px 0 8px; }
+.row-title { font-size:18px; font-weight:700; padding:0 4%; margin-bottom:8px; }
+.card-scroll { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:10px; padding:0 4% 12px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.card-scroll::-webkit-scrollbar { display:none; }
+.card { flex:0 0 auto; width:130px; scroll-snap-align:start; cursor:pointer; transition:transform .2s; border-radius:6px; overflow:hidden; background:#1e1e1e; border:2px solid transparent; }
+.card:active { transform:scale(.96); border-color:var(--red); }
+.card-img { width:130px; height:195px; object-fit:cover; display:block; background:#1e1e1e; }
+.card-body { padding:6px 8px; }
+.card-title { font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.card-meta { font-size:10px; color:var(--gray); margin-top:2px; }
+.card-badge { position:absolute; top:6px; left:6px; background:var(--red); color:var(--white); font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; letter-spacing:.3px; }
+.card-wrap { position:relative; }
+
+/* Detail Modal */
+.modal-overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.7); display:none; align-items:flex-end; justify-content:center; animation:fadeIn .2s; }
+.modal-overlay.open { display:flex; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal { background:var(--surface); width:100%; max-height:90vh; border-radius:16px 16px 0 0; overflow-y:auto; animation:slideUp .3s; padding:20px 20px 30px; }
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-close { position:absolute; top:16px; right:16px; background:none; border:none; color:var(--gray); font-size:22px; cursor:pointer; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.modal-close:active { color:var(--white); }
+.modal-top { display:flex; gap:14px; margin-bottom:14px; }
+.modal-poster { width:110px; height:165px; object-fit:cover; border-radius:8px; flex-shrink:0; background:#1e1e1e; }
+.modal-info { flex:1; min-width:0; }
+.modal-title { font-size:20px; font-weight:700; margin-bottom:4px; }
+.modal-meta { font-size:12px; color:var(--gray); margin-bottom:10px; }
+.modal-overview { font-size:13px; color:var(--gray); line-height:1.5; margin-bottom:14px; }
+.modal-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.modal-actions .btn-play, .modal-actions .btn-info { font-size:13px; padding:8px 18px; }
+
+/* Season/Episode */
+.season-ep { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.season-ep label { font-size:12px; color:var(--gray); }
+.season-ep select, .season-ep input { background:var(--input); border:1px solid var(--border); color:var(--white); padding:6px 10px; border-radius:6px; font-size:13px; width:60px; }
+
+/* Subtitles */
+.sub-section { margin-top:10px; }
+.sub-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.sub-header select { background:var(--input); border:1px solid var(--border); color:var(--white); padding:5px 8px; border-radius:6px; font-size:12px; }
+.btn-sub { background:#4a4a4a; color:var(--white); border:none; font-size:11px; font-weight:700; padding:6px 12px; border-radius:5px; cursor:pointer; }
+.btn-sub:active { background:#666; }
+.sub-list { list-style:none; }
+.sub-list li { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--input); border-radius:6px; margin-bottom:4px; font-size:12px; }
+.sub-list li .sub-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sub-list li .sub-dl { font-size:10px; color:var(--gray); margin-left:8px; }
+.sub-empty { font-size:12px; color:var(--dim); text-align:center; padding:16px; }
+
+/* Status Bar */
+.statusbar { position:fixed; bottom:0; left:0; right:0; background:#080808; color:var(--gray); font-size:11px; padding:6px 16px; z-index:50; }
+
+/* Loading Spinner */
+.spinner { display:inline-block; width:18px; height:18px; border:2px solid var(--gray); border-top-color:var(--red); border-radius:50%; animation:spin .6s linear infinite; margin-right:8px; vertical-align:middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Placeholder */
+.placeholder { background:#1e1e1e; display:flex; align-items:center; justify-content:center; color:#444; font-size:11px; }
+
+/* Responsive */
+@media(min-width:768px) {
+  .card { width:170px; }
+  .card-img { width:170px; height:255px; }
+  .hero { min-height:60vh; }
+  .hero-info { max-width:50%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">MOVIESEARCHER</div>
+  <div class="toggle">
+    <button id="btnMovies" class="active" onclick="setType('movie')">Movies</button>
+    <button id="btnTV" onclick="setType('tv')">TV Series</button>
+  </div>
+  <div class="search-wrap">
+    <span class="s-icon">🔍</span>
+    <input id="searchInput" type="text" placeholder="Search..." autocomplete="off">
+  </div>
+</div>
+
+<!-- Hero Banner -->
+<div id="heroBanner" class="hero" style="display:none;">
+  <div id="heroBg" class="hero-bg"></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-left"></div>
+  <div class="hero-info">
+    <div id="heroBadge" class="hero-badge" style="display:none;">SERIES</div>
+    <div id="heroTitle" class="hero-title"></div>
+    <div id="heroMeta" class="hero-meta"></div>
+    <div id="heroOverview" class="hero-overview"></div>
+    <div class="btn-row">
+      <button class="btn-play" onclick="playHero()">▶ Play</button>
+      <button class="btn-info" onclick="showDetail(heroItem)">ℹ More Info</button>
+    </div>
+  </div>
+</div>
+
+<!-- Results Row -->
+<div id="resultsRow" class="row" style="display:none;">
+  <div class="row-title">Results</div>
+  <div id="cardScroll" class="card-scroll"></div>
+</div>
+
+<!-- Detail Modal -->
+<div id="modalOverlay" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-top">
+      <img id="modalPoster" class="modal-poster" src="" alt="">
+      <div class="modal-info">
+        <div id="modalTitle" class="modal-title"></div>
+        <div id="modalMeta" class="modal-meta"></div>
+        <div id="seasonEp" class="season-ep" style="display:none;">
+          <label>Season:</label>
+          <input id="seasonInput" type="number" min="1" max="50" value="1">
+          <label>Episode:</label>
+          <input id="episodeInput" type="number" min="1" max="100" value="1">
+        </div>
+      </div>
+    </div>
+    <div id="modalOverview" class="modal-overview"></div>
+    <div class="modal-actions">
+      <button class="btn-play" onclick="playCurrent()">▶ Play</button>
+      <button class="btn-info" onclick="openBrowser()">🌐 Open in Browser</button>
+    </div>
+    <div class="sub-section">
+      <div class="sub-header">
+        <span style="font-size:12px;color:var(--gray);">Subtitles:</span>
+        <select id="subLang">
+          <option value="en">English</option><option value="es">Spanish</option>
+          <option value="fr">French</option><option value="de">German</option>
+          <option value="ja">Japanese</option><option value="ko">Korean</option>
+          <option value="zh">Chinese</option><option value="pt">Portuguese</option>
+          <option value="it">Italian</option><option value="ar">Arabic</option>
+          <option value="ru">Russian</option>
+        </select>
+        <button class="btn-sub" onclick="searchSubs()">Search</button>
+      </div>
+      <div id="subResults"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Status Bar -->
+<div id="statusbar" class="statusbar">Search for any movie or TV show</div>
+
+<script>
+// --- Config ---
+const TMDB_KEY = '37b9d2e54fab7830f59d8a926fab2129';
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const IMG_BASE = 'https://image.tmdb.org/t/p/';
+const VIDSRC = 'https://player.vidzee.wtf/embed/movie';
+const OS_KEY = 'ykpPRaaHLaN5PSI0q3hU1jnmfkq8e6SH';
+const OS_BASE = 'https://api.opensubtitles.com/api/v1';
+const OS_USER = 'Elmahdy2355';
+const OS_PASS = '30504050mM';
+
+let searchType = 'movie';
+let results = [];
+let currentItem = null;
+let heroItem = null;
+let osToken = null;
+
+// --- Search ---
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+function setType(t) {
+  searchType = t;
+  document.getElementById('btnMovies').classList.toggle('active', t === 'movie');
+  document.getElementById('btnTV').classList.toggle('active', t === 'tv');
+  doSearch();
+}
+
+async function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  setStatus('Searching "' + q + '"...');
+  const endpoint = searchType === 'tv' ? '/search/tv' : '/search/movie';
+  try {
+    const resp = await fetch(`${TMDB_BASE}${endpoint}?query=${encodeURIComponent(q)}&api_key=${TMDB_KEY}`);
+    const data = await resp.json();
+    results = (data.results || []).slice(0, 20).map(item => {
+      const isTV = searchType === 'tv';
+      return {
+        title: isTV ? item.name : item.title,
+        year: (isTV ? item.first_air_date : item.release_date || '').slice(0, 4),
+        rating: item.vote_average || 0,
+        overview: item.overview || '',
+        poster: item.poster_path ? IMG_BASE + 'w185' + item.poster_path : '',
+        backdrop: item.backdrop_path ? IMG_BASE + 'w780' + item.backdrop_path : '',
+        tmdb_id: item.id,
+        type: searchType,
+        seasons: isTV ? (item.number_of_seasons || 1) : 0,
+      };
+    });
+    renderResults();
+    setStatus(results.length + ' results for "' + q + '"');
+  } catch (e) {
+    setStatus('Search failed. Check your connection.');
+  }
+}
+
+// --- Render ---
+function renderResults() {
+  if (!results.length) {
+    document.getElementById('heroBanner').style.display = 'none';
+    document.getElementById('resultsRow').style.display = 'none';
+    return;
+  }
+  // Hero
+  heroItem = results[0];
+  const hero = document.getElementById('heroBanner');
+  hero.style.display = '';
+  if (heroItem.backdrop) {
+    document.getElementById('heroBg').style.backgroundImage = `url(${heroItem.backdrop})`;
+  }
+  document.getElementById('heroBadge').style.display = heroItem.type === 'tv' ? '' : 'none';
+  document.getElementById('heroTitle').textContent = heroItem.title;
+  document.getElementById('heroMeta').textContent =
+    (heroItem.type === 'tv' ? 'TV Series' : 'Film') + '  |  ' + heroItem.year + '  |  ★ ' + heroItem.rating.toFixed(1) + '/10';
+  document.getElementById('heroOverview').textContent = heroItem.overview;
+
+  // Cards
+  const scroll = document.getElementById('cardScroll');
+  scroll.innerHTML = '';
+  results.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.onclick = () => showDetail(item);
+    card.innerHTML = `
+      <div class="card-wrap">
+        <img class="card-img" src="${item.poster || ''}" alt="" onerror="this.classList.add('placeholder');this.src='';this.style.width='130px';this.style.height='195px';this.textContent='No Image';">
+        ${item.type === 'tv' ? '<span class="card-badge">SERIES</span>' : ''}
+      </div>
+      <div class="card-body">
+        <div class="card-title">${esc(item.title)}</div>
+        <div class="card-meta">${item.year}  ★ ${item.rating.toFixed(1)}</div>
+      </div>`;
+    scroll.appendChild(card);
+  });
+  document.getElementById('resultsRow').style.display = '';
+}
+
+// --- Detail Modal ---
+function showDetail(item) {
+  currentItem = item;
+  document.getElementById('modalPoster').src = item.poster ? item.poster.replace('/w185/', '/w342/') : '';
+  document.getElementById('modalTitle').textContent = item.title;
+  document.getElementById('modalMeta').textContent =
+    (item.type === 'tv' ? 'TV Series' : 'Movie') + '  |  ' + item.year + '  |  ★ ' + item.rating.toFixed(1) + '/10';
+  document.getElementById('modalOverview').textContent = item.overview;
+
+  const se = document.getElementById('seasonEp');
+  if (item.type === 'tv') {
+    se.style.display = 'flex';
+    document.getElementById('seasonInput').max = item.seasons || 1;
+  } else {
+    se.style.display = 'none';
+  }
+  document.getElementById('subResults').innerHTML = '<div class="sub-empty">Search for subtitles</div>';
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// --- Play ---
+function playHero() { if (heroItem) openPlayer(heroItem); }
+
+function playCurrent() { if (currentItem) openPlayer(currentItem); }
+
+function openPlayer(item) {
+  let url;
+  if (item.type === 'tv') {
+    const s = document.getElementById('seasonInput').value || 1;
+    const e = document.getElementById('episodeInput').value || 1;
+    url = `https://player.vidzee.wtf/embed/tv/${item.tmdb_id}/${s}/${e}`;
+  } else {
+    url = `${VIDSRC}/${item.tmdb_id}`;
+  }
+  window.open(url, '_blank');
+  setStatus('Playing ' + item.title + '...');
+  closeModal();
+}
+
+function openBrowser() {
+  playCurrent();
+}
+
+// --- Subtitles ---
+async function searchSubs() {
+  if (!currentItem) return;
+  const lang = document.getElementById('subLang').value;
+  setStatus('Searching subtitles...');
+
+  // Fetch IMDB ID if we don't have it
+  let imdbId = currentItem.imdb_id;
+  if (!imdbId) {
+    try {
+      const endpoint = currentItem.type === 'tv' ? `/tv/${currentItem.tmdb_id}` : `/movie/${currentItem.tmdb_id}`;
+      const resp = await fetch(`${TMDB_BASE}${endpoint}?api_key=${TMDB_KEY}`);
+      const data = await resp.json();
+      imdbId = data.imdb_id;
+      if (!imdbId) { document.getElementById('subResults').innerHTML = '<div class="sub-empty">IMDB ID not found</div>'; return; }
+    } catch (e) { document.getElementById('subResults').innerHTML = '<div class="sub-empty">Failed to fetch IMDB ID</div>'; return; }
+  }
+
+  try {
+    const resp = await fetch(`${OS_BASE}/subtitles?imdb_id=${imdbId.replace('tt','')}&languages=${lang}`, {
+      headers: { 'Api-Key': OS_KEY, 'User-Agent': 'MovieSearcher v2.0' }
+    });
+    const data = await resp.json();
+    const subs = (data.data || []).filter(d => d.attributes && d.attributes.files && d.attributes.files.length);
+    if (!subs.length) { document.getElementById('subResults').innerHTML = '<div class="sub-empty">No subtitles found</div>'; setStatus('No subtitles found'); return; }
+
+    let html = '<ul class="sub-list">';
+    subs.forEach(s => {
+      const name = s.attributes.release || 'Unknown';
+      const langName = s.attributes.language || '';
+      const fileId = s.attributes.files[0].file_id;
+      html += `<li><span class="sub-name">${esc(name)} (${langName})</span><button class="btn-sub" onclick="downloadSub(${fileId})">⬇</button></li>`;
+    });
+    html += '</ul>';
+    document.getElementById('subResults').innerHTML = html;
+    setStatus(subs.length + ' subtitles found');
+  } catch (e) {
+    document.getElementById('subResults').innerHTML = '<div class="sub-empty">Subtitle search unavailable on mobile</div>';
+    setStatus('Subtitle search failed (CORS may block this on mobile)');
+  }
+}
+
+async function downloadSub(fileId) {
+  setStatus('Downloading subtitle...');
+  try {
+    // Login first
+    const loginResp = await fetch(`${OS_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Api-Key': OS_KEY, 'User-Agent': 'MovieSearcher v2.0', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: OS_USER, password: OS_PASS })
+    });
+    const loginData = await loginResp.json();
+    const token = loginData.token;
+
+    const dlResp = await fetch(`${OS_BASE}/download`, {
+      method: 'POST',
+      headers: { 'Api-Key': OS_KEY, 'User-Agent': 'MovieSearcher v2.0', 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ file_id: fileId })
+    });
+    const dlData = await dlResp.json();
+    if (dlData.link) {
+      window.open(dlData.link, '_blank');
+      setStatus('Subtitle downloaded');
+    } else {
+      setStatus('Download failed');
+    }
+  } catch (e) {
+    setStatus('Subtitle download failed (CORS may block this on mobile)');
+  }
+}
+
+// --- Helpers ---
+function setStatus(msg) { document.getElementById('statusbar').textContent = msg; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// --- Service Worker ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
